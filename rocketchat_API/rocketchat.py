@@ -672,7 +672,16 @@ class RocketChat:
         return self.__call_api_post('assets.unsetAsset', assetName, kwargs=kwargs)
 
     def assets_setAsset(self, **kwargs):
-        return self.__call_api_post('assets.setAsset', kwargs=kwargs)
+        """Set an asset image by name."""
+        content_type = mimetypes.MimeTypes().guess_type(file)
+        files = {
+            asset_name: (file, open(file, 'rb'), content_type[0], {'Expires': '0'}),
+        }
+        return self.__call_api_post('assets.setAsset', kwargs=kwargs, use_json=False, files=files)
+
+    def assets_unset_asset(self, asset_name):
+        """Unset an asset by name"""
+        return self.__call_api_post('assets.unsetAsset', assetName=asset_name)
 
     # Permissions
 
