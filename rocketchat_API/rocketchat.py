@@ -664,6 +664,15 @@ class RocketChat:
     def create_integration(self, **kwargs):
         """Create integrations"""
         return self.__call_api_post('integrations.create', kwargs=kwargs)
+		
+	# Assets
+
+    def assets_unsetAsset(self, assetName, **kwargs):
+        """Remove assets from RocketChat """
+        return self.__call_api_post('assets.unsetAsset', assetName, kwargs=kwargs)
+
+    def assets_setAsset(self, **kwargs):
+        return self.__call_api_post('assets.setAsset', kwargs=kwargs)
 
     # Permissions
 
@@ -674,12 +683,8 @@ class RocketChat:
     def permissions_update(self, **kwargs):
         """Update permissions"""
         return self.__call_api_post('permissions.update', kwargs=kwargs)
-
-    # Assets
-
-    def assets_unsetAsset(self, assetName, **kwargs):
-        """Remove assets from RocketChat """
-        return self.__call_api_post('assets.unsetAsset', assetName, kwargs=kwargs)
-
-    def assets_setAsset(self, **kwargs):
-        return self.__call_api_post('assets.setAsset', kwargs=kwargs)
+		
+		
+    def permissions_list_all(self, **kwargs):
+        """Returns all permissions from the server."""
+        return self.__call_api_get('permissions.listAll', kwargs=kwargs)
