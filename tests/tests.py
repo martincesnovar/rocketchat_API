@@ -999,13 +999,17 @@ class TestPermissions(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def test_get_permissions(self):
-        permission_get = self.rocket.permissions_get().json()
-        self.assertTrue(permission_get.get('success'), 'Call did not succeed')
+    def test_permissions_list_all(self):
+        permissions_list_all = self.rocket.permissions_list_all().json()
+        self.assertTrue(permissions_list_all.get('success'))
+        self.assertIn('update', permissions_list_all)
+        self.assertIn('remove', permissions_list_all)
 
-    def test_permission_update(self):
-        permission_update = self.rocket.permission_update().json()
-        self.assertTrue(permission_update.get('success'), 'Call did not succeed')
+    def test_permissions_list_all_with_updatedSince(self):
+        permissions_list_all = self.rocket.permissions_list_all(updatedSince='2017-11-25T15:08:17.248Z').json()
+        self.assertTrue(permissions_list_all.get('success'))
+        self.assertIn('update', permissions_list_all)
+        self.assertIn('remove', permissions_list_all)
 
 
 class TestAssets(unittest.TestCase):
@@ -1021,13 +1025,13 @@ class TestAssets(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def test_set_assets(self):
-        set_asset_get = self.rocket.assets_setAsset().json()
-        self.assertTrue(set_asset_get.get('success'), 'Call did not succeed')
+    def test_assets_set_asset(self):
+        assets_set_asset = self.rocket.assets_set_asset(asset_name='logo', file='tests/logo.png').json()
+        self.assertTrue(assets_set_asset.get('success'))
 
-    def test_unset_assets(self):
-        unset_asset_get = self.rocket.assets_unsetAsset().json()
-        self.assertTrue(set_asset_get.get('success'), 'Call did not succeed')
+    def test_assets_unset_asset(self):
+        assets_unset_asset = self.rocket.assets_unset_asset(asset_name='logo').json()
+        self.assertTrue(assets_unset_asset.get('success'))
 
 
 if __name__ == '__main__':
