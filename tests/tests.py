@@ -66,6 +66,16 @@ class TestUsers(unittest.TestCase):
         self.assertTrue('authToken' in login.get('data'))
         self.assertTrue('userId' in login.get('data'))
 
+    def test_login_email(self):
+        login = self.rocket.login(self.email, self.password).json()
+
+        with self.assertRaises(RocketAuthenticationException):
+            self.rocket.login(self.user, 'bad_password')
+
+        self.assertEqual(login.get('status'), 'success')
+        self.assertTrue('authToken' in login.get('data'))
+        self.assertTrue('userId' in login.get('data'))
+
     def test_me(self):
         me = self.rocket.me().json()
         self.assertTrue(me.get('success'))
@@ -178,11 +188,9 @@ class TestUsers(unittest.TestCase):
                         users_set_avatar.get('error'))
 
     def test_users_set_avatar_from_url(self):
-        # ToDo: Users.setAvatar calls https://secure.gravatar.com/avatar/ before actually do anything
-        self.skipTest(
-            "possible API bug on users.setAvatar when using avatarUrl")
+        # ToDo: Modify this test so it can run while offline
         users_set_avatar = self.rocket.users_set_avatar(
-            avatar_url='http://182.17.0.1:9999/avatar.png').json()
+            avatar_url='https://api.adorable.io/avatars/285/rocket.face.png').json()
         self.assertTrue(users_set_avatar.get('success'),
                         users_set_avatar.get('error'))
 
@@ -348,11 +356,24 @@ class TestChannels(unittest.TestCase):
             'GENERAL', me.get('_id')).json()
         self.assertTrue(channels_remove_moderator.get('success'))
 
+    def test_channels_list_moderator(self):
+        channels_list_moderator = self.rocket.channels_moderators(
+            room_id='GENERAL').json()
+        self.assertTrue(channels_list_moderator.get('success'))
+        channel_name = self.rocket.channels_info(room_id='GENERAL').json().get("channel").get("name")
+        channels_list_moderator_by_name = self.rocket.channels_moderators(
+            channel=channel_name).json()
+        self.assertTrue(channels_list_moderator_by_name.get('success'))
+        with self.assertRaises(RocketMissingParamException):
+            self.rocket.channels_moderators()
+
     def test_channels_add_and_remove_owner(self):
         channels_add_owner = self.rocket.channels_add_owner('GENERAL',
                                                             user_id=self.testuser_id).json()
         self.assertTrue(channels_add_owner.get('success'),
                         channels_add_owner.get('error'))
+        another_owner_id = self.rocket.users_info(username='user1').json().get('user').get('_id')
+        self.rocket.channels_add_owner('GENERAL', user_id=another_owner_id).json()
         channels_remove_owner = self.rocket.channels_remove_owner('GENERAL',
                                                                   user_id=self.testuser_id).json()
         self.assertTrue(channels_remove_owner.get('success'),
@@ -596,6 +617,16 @@ class TestGroups(unittest.TestCase):
             self.test_group_id, me.get('_id')).json()
         self.assertTrue(groups_remove_moderator.get('success'))
 
+    def test_groups_list_moderator(self):
+        groups_list_moderator = self.rocket.groups_moderators(
+            room_id=self.test_group_id).json()
+        self.assertTrue(groups_list_moderator.get('success'))
+        groups_list_moderator_by_name = self.rocket.groups_moderators(
+            group=self.test_group_name).json()
+        self.assertTrue(groups_list_moderator_by_name.get('success'))
+        with self.assertRaises(RocketMissingParamException):
+            self.rocket.groups_moderators()
+
     def test_groups_add_and_remove_owner(self):
         self.rocket.groups_invite(
             self.test_group_id, self.testuser_id)
@@ -811,6 +842,16 @@ class TestRooms(unittest.TestCase):
         with self.assertRaises(RocketMissingParamException):
             self.rocket.rooms_favorite()
 
+    def test_rooms_info(self):
+        rooms_infoby_name = self.rocket.rooms_info(room_name='general').json()
+        self.assertTrue(rooms_infoby_name.get('success'))
+        self.assertEqual('GENERAL', rooms_infoby_name.get('room').get('_id'))
+        rooms_info_by_id = self.rocket.rooms_info(room_id='GENERAL').json()
+        self.assertTrue(rooms_info_by_id.get('success'))
+        self.assertEqual('GENERAL', rooms_info_by_id.get('room').get('_id'))
+        with self.assertRaises(RocketMissingParamException):
+            self.rocket.rooms_info()
+
 
 class TestIMs(unittest.TestCase):
     def setUp(self):
@@ -973,8 +1014,7 @@ class TestSubscriptions(unittest.TestCase):
         self.assertTrue(subscriptions_read.get('success'), 'Call did not succeed')
 
 
-
-class TestIntegrations(unittest.TestCase):
+class TestAssets(unittest.TestCase):
     def setUp(self):
         self.rocket = RocketChat()
         self.user = 'user1'
@@ -987,9 +1027,13 @@ class TestIntegrations(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def test_set_integrations(self):
-        create_integration = self.rocket.create_integration().json()
-        self.assertTrue(create_integration.get('success'), 'Call did not succeed')
+    def test_assets_set_asset(self):
+        assets_set_asset = self.rocket.assets_set_asset(asset_name='logo', file='tests/logo.png').json()
+        self.assertTrue(assets_set_asset.get('success'))
+
+    def test_assets_unset_asset(self):
+        assets_unset_asset = self.rocket.assets_unset_asset(asset_name='logo').json()
+        self.assertTrue(assets_unset_asset.get('success'))
 
 
 class TestPermissions(unittest.TestCase):
@@ -1016,28 +1060,6 @@ class TestPermissions(unittest.TestCase):
         self.assertTrue(permissions_list_all.get('success'))
         self.assertIn('update', permissions_list_all)
         self.assertIn('remove', permissions_list_all)
-
-
-class TestAssets(unittest.TestCase):
-    def setUp(self):
-        self.rocket = RocketChat()
-        self.user = 'user1'
-        self.password = 'password'
-        self.email = 'email@domain.com'
-        self.rocket.users_register(
-            email=self.email, name=self.user, password=self.password, username=self.user)
-        self.rocket = RocketChat(self.user, self.password)
-
-    def tearDown(self):
-        pass
-
-    def test_assets_set_asset(self):
-        assets_set_asset = self.rocket.assets_set_asset(asset_name='logo', file='tests/logo.png').json()
-        self.assertTrue(assets_set_asset.get('success'))
-
-    def test_assets_unset_asset(self):
-        assets_unset_asset = self.rocket.assets_unset_asset(asset_name='logo').json()
-        self.assertTrue(assets_unset_asset.get('success'))
 
 
 if __name__ == '__main__':

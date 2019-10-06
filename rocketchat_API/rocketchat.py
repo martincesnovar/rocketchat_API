@@ -1,6 +1,8 @@
 # -*-coding:utf-8-*-
 import logging
-
+import mimetypes
+import os
+import re
 import requests
 
 from rocketchat_API.APIExceptions.RocketExceptions import RocketConnectionException, RocketAuthenticationException, \
@@ -11,17 +13,18 @@ logging.basicConfig(level=logging.WARNING,
 
 
 class RocketChat:
-    headers = {}
     API_path = '/api/v1/'
 
     def __init__(self, user=None, password=None, auth_token=None, user_id=None,
                  server_url='http://127.0.0.1:3000', ssl_verify=True, proxies=None,
-                 timeout=30):
+                 timeout=30, session=None):
         """Creates a RocketChat object and does login on the specified server"""
+        self.headers = {}
         self.server_url = server_url
         self.proxies = proxies
         self.ssl_verify = ssl_verify
         self.timeout = timeout
+        self.req = session or requests
         if user and password:
             self.login(user, password)
         if auth_token and user_id:
@@ -39,9 +42,9 @@ class RocketChat:
 
     def __call_api_get(self, method, **kwargs):
         args = self.__reduce_kwargs(kwargs)
-        return requests.get(self.server_url + self.API_path + method + '?' +
+        return self.req.get(self.server_url + self.API_path + method + '?' +
                             '&'.join([i + '=' + str(args[i])
-                                      for i in args.keys()]),
+                                      for i in args]),
                             headers=self.headers,
                             verify=self.ssl_verify,
                             proxies=self.proxies,
@@ -55,7 +58,7 @@ class RocketChat:
         if 'password' in reduced_args and method != 'users.create':
             reduced_args['pass'] = reduced_args['password']
         if use_json:
-            return requests.post(self.server_url + self.API_path + method,
+            return self.req.post(self.server_url + self.API_path + method,
                                  json=reduced_args,
                                  files=files,
                                  headers=self.headers,
@@ -64,7 +67,7 @@ class RocketChat:
                                  timeout=self.timeout
                                  )
         else:
-            return requests.post(self.server_url + self.API_path + method,
+            return self.req.post(self.server_url + self.API_path + method,
                                  data=reduced_args,
                                  files=files,
                                  headers=self.headers,
@@ -76,9 +79,15 @@ class RocketChat:
     # Authentication
 
     def login(self, user, password):
+        request_data = {
+            'password': password
+        }
+        if re.match(r'^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,4})$', user):
+            request_data['user'] = user
+        else:
+            request_data['username'] = user
         login_request = requests.post(self.server_url + self.API_path + 'login',
-                                      data={'username': user,
-                                            'password': password},
+                                      data=request_data,
                                       verify=self.ssl_verify,
                                       proxies=self.proxies)
         if login_request.status_code == 401:
@@ -177,7 +186,7 @@ class RocketChat:
     def users_set_avatar(self, avatar_url, **kwargs):
         """Set a user’s avatar"""
         if avatar_url.startswith('http://') or avatar_url.startswith('https://'):
-            return self.__call_api_post('users.setAvatar', avatarURL=avatar_url, kwargs=kwargs)
+            return self.__call_api_post('users.setAvatar', avatarUrl=avatar_url, kwargs=kwargs)
         else:
             avatar_file = {"image": open(avatar_url, "rb")}
             return self.__call_api_post('users.setAvatar', files=avatar_file, kwargs=kwargs)
@@ -288,6 +297,15 @@ class RocketChat:
     def channels_remove_moderator(self, room_id, user_id, **kwargs):
         """Removes the role of moderator from a user in the current channel."""
         return self.__call_api_post('channels.removeModerator', roomId=room_id, userId=user_id, kwargs=kwargs)
+
+    def channels_moderators(self, room_id=None, channel=None, **kwargs):
+        """Lists all moderators of a channel."""
+        if room_id:
+            return self.__call_api_get('channels.moderators', roomId=room_id, kwargs=kwargs)
+        elif channel:
+            return self.__call_api_get('channels.moderators', roomName=channel, kwargs=kwargs)
+        else:
+            raise RocketMissingParamException('roomId or channel required')
 
     def channels_add_owner(self, room_id, user_id=None, username=None, **kwargs):
         """Gives the role of owner for a user in the current channel."""
@@ -434,6 +452,15 @@ class RocketChat:
     def groups_remove_moderator(self, room_id, user_id, **kwargs):
         """Removes the role of moderator from a user in the current groups."""
         return self.__call_api_post('groups.removeModerator', roomId=room_id, userId=user_id, kwargs=kwargs)
+
+    def groups_moderators(self, room_id=None, group=None, **kwargs):
+        """Lists all moderators of a group."""
+        if room_id:
+            return self.__call_api_get('groups.moderators', roomId=room_id, kwargs=kwargs)
+        elif group:
+            return self.__call_api_get('groups.moderators', roomName=group, kwargs=kwargs)
+        else:
+            raise RocketMissingParamException('roomId or group required')
 
     def groups_add_owner(self, room_id, user_id, **kwargs):
         """Gives the role of owner for a user in the current Group."""
@@ -624,7 +651,7 @@ class RocketChat:
     def rooms_upload(self, rid, file, **kwargs):
         """Post a message with attached file to a dedicated room."""
         files = {
-            'file': open(file, 'rb')
+            'file': (os.path.basename(file), open(file, 'rb'), mimetypes.guess_type(file)[0]),
         }
         return self.__call_api_post('rooms.upload/' + rid, kwargs=kwargs, use_json=False, files=files)
 
@@ -645,6 +672,15 @@ class RocketChat:
         else:
             raise RocketMissingParamException('roomId or roomName required')
 
+    def rooms_info(self, room_id=None, room_name=None):
+        """Retrieves the information about the room."""
+        if room_id is not None:
+            return self.__call_api_get('rooms.info', roomId=room_id)
+        elif room_name is not None:
+            return self.__call_api_get('rooms.info', roomName=room_name)
+        else:
+            raise RocketMissingParamException('roomId or roomName required')
+
     # Subscriptions
 
     def subscriptions_get(self, **kwargs):
@@ -659,19 +695,13 @@ class RocketChat:
         """Mark messages as unread by roomId or from a message"""
         return self.__call_api_post('subscriptions.unread', roomId=room_id, kwargs=kwargs)
 
-    # Integrations
+    def subscriptions_read(self, rid, **kwargs):
+        """Mark room as read"""
+        return self.__call_api_post('subscriptions.read', rid=rid, kwargs=kwargs)
 
-    def create_integration(self, **kwargs):
-        """Create integrations"""
-        return self.__call_api_post('integrations.create', kwargs=kwargs)
-		
-	# Assets
+    # Assets
 
-    def assets_unsetAsset(self, assetName, **kwargs):
-        """Remove assets from RocketChat """
-        return self.__call_api_post('assets.unsetAsset', assetName, kwargs=kwargs)
-
-    def assets_setAsset(self, **kwargs):
+    def assets_set_asset(self, asset_name, file, **kwargs):
         """Set an asset image by name."""
         content_type = mimetypes.MimeTypes().guess_type(file)
         files = {
@@ -684,16 +714,6 @@ class RocketChat:
         return self.__call_api_post('assets.unsetAsset', assetName=asset_name)
 
     # Permissions
-
-    def permissions_get(self, **kwargs):
-        """get perrmissions"""
-        return self.__call_api_get('permissions.list', kwargs=kwargs)
-
-    def permissions_update(self, **kwargs):
-        """Update permissions"""
-        return self.__call_api_post('permissions.update', kwargs=kwargs)
-		
-		
     def permissions_list_all(self, **kwargs):
         """Returns all permissions from the server."""
         return self.__call_api_get('permissions.listAll', kwargs=kwargs)
