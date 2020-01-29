@@ -26,7 +26,7 @@ class RocketChat:
         self.timeout = timeout
         self.req = session or requests
         if user and password:
-            self.login(user, password)
+            self.login(user, password)  # skipcq: PTC-W1006
         if auth_token and user_id:
             self.headers['X-Auth-Token'] = auth_token
             self.headers['X-User-Id'] = user_id
@@ -422,11 +422,20 @@ class RocketChat:
         elif room_name:
             return self.__call_api_get('channels.files', roomName=room_name, kwargs=kwargs)
         else:
-            raise RocketMissingParamException('roomId or room_name required')
+            raise RocketMissingParamException('room_id or room_name required')
 
     def channels_get_all_user_mentions_by_channel(self, room_id, **kwargs):
         """Gets all the mentions of a channel."""
         return self.__call_api_get('channels.getAllUserMentionsByChannel', roomId=room_id, kwargs=kwargs)
+
+    def channels_counters(self, room_id=None, room_name=None, **kwargs):
+        """Gets counters for a channel."""
+        if room_id:
+            return self.__call_api_get('channels.counters', roomId=room_id, kwargs=kwargs)
+        elif room_name:
+            return self.__call_api_get('channels.counters', roomName=room_name, kwargs=kwargs)
+        else:
+            raise RocketMissingParamException('room_id or room_name required')
 
     # Groups
 
@@ -634,17 +643,17 @@ class RocketChat:
 
     # Settings
 
-    def settings_get(self, _id):
+    def settings_get(self, _id, **kwargs):
         """Gets the setting for the provided _id."""
-        return self.__call_api_get('settings/' + _id)
+        return self.__call_api_get('settings/' + _id, kwargs=kwargs)
 
-    def settings_update(self, _id, value):
+    def settings_update(self, _id, value, **kwargs):
         """Updates the setting for the provided _id."""
-        return self.__call_api_post('settings/' + _id, value=value)
+        return self.__call_api_post('settings/' + _id, value=value, kwargs=kwargs)
 
-    def settings(self):
+    def settings(self, **kwargs):
         """List all private settings."""
-        return self.__call_api_get('settings')
+        return self.__call_api_get('settings', kwargs=kwargs)
 
     # Rooms
 
